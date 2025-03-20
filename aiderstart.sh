@@ -1,5 +1,8 @@
 #!/bin/bash
 
+ormodel="openrouter/google/gemini-2.0-flash-lite-preview-02-05:free"
+gmodel="groq/llama-3.3-70b-versatile"
+
 # Define the script's main function
 main() {
   # Check if a valid provider is provided
@@ -7,8 +10,12 @@ main() {
     groq|g|openrouter|o|"")
       # valid providers, so continue to the rest of the script
       ;;
+    -h|--help)
+      display_help
+      exit 0
+      ;;
     *)
-      echo "Invalid option"
+      echo "Invalid option. Use -h or --help for usage information."
       exit 1;;
   esac
 
@@ -23,6 +30,19 @@ main() {
 
   # Run aider with the selected model and API key
   run_aider "$selected_model" "$api_key"
+}
+
+# Function to display help/usage information
+display_help() {
+  echo "Usage: $0 [PROVIDER]"
+  echo "  PROVIDER:"
+  echo "    openrouter (or o): Use OpenRouter models (default)"
+  echo "    groq (or g): Use Groq models"
+  echo "    -h or --help: Display this help message"
+  echo ""
+  echo "Examples:"
+  echo "  $0 openrouter"
+  echo "  $0" # Uses OpenRouter by default
 }
 
 # Function to list models for a given provider
@@ -76,7 +96,10 @@ set_api_key() {
       return 1
       ;;
   esac
-  echo "$api_key"
+  # Mask the API key in the output, but also mask it in the variable
+  masked_api_key=$(echo "$api_key" | sed 's/\([^=]*=\).*/\1*****/')
+  echo "$masked_api_key"
+  echo "$api_key" > /tmp/aider_api_key  # Store the full API key in a temporary file
   return 0
 }
 
@@ -90,13 +113,18 @@ run_aider() {
     return 1
   fi
 
-  echo "Running aider with model: $model and API key: $api_key"
+  echo "Running aider with model: $model"
+  # Use the temporary file to pass the API key to aider
+  aider --no-show-model-warnings --no-auto-commits --no-dirty-commits --model "$model" --api-key "$(cat /tmp/aider_api_key)"
+  rm /tmp/aider_api_key # Remove the temporary file
 
-  echo aider --no-auto-commits --no-dirty-commits --model "$model" --api-key "$api_key"
-  aider --no-auto-commits --no-dirty-commits --model "$model" --api-key "$api_key"
+  if [ $? -ne 0 ]; then
+    echo "Error running aider. Check the model name and API key."
+    return 1
+  fi
 
   return 0
 }
 
 # Call the main function
-main
+main "$@"
