@@ -1,17 +1,31 @@
 #!/bin/bash
 
-## get provider
-provider=$1
+# Define the script's main function
+main() {
+  # Check if a valid provider is provided
+  case $1 in
+    groq|g|openrouter|o|"")
+      # valid providers, so continue to the rest of the script
+      ;;
+    *)
+      echo "Invalid option"
+      exit 1;;
+  esac
 
-## keys
-export OPEN_ROUTER_KEY=${OPEN_ROUTER_KEY:-""}
-export GROQ_API_KEY=${GROQ_API_KEY:-""}
+  # List models for the selected provider
+  list_models "$1"
 
-## models
-gmodel="groq/llama-3.3-70b-versatile"
-ormodel="openrouter/google/gemini-2.0-flash-lite-preview-02-05:free"
+  # Select a model from the list
+  selected_model=$(select_model "$1")
 
-# Function to list models
+  # Set the API key for the selected provider
+  api_key=$(set_api_key "$1")
+
+  # Run aider with the selected model and API key
+  run_aider "$selected_model" "$api_key"
+}
+
+# Function to list models for a given provider
 list_models() {
   provider_arg=$1
   if [[ "$provider_arg" == "groq" || "$provider_arg" == "g" ]]; then
@@ -25,7 +39,7 @@ list_models() {
   return 0
 }
 
-# Function to select a model
+# Function to select a model from the list
 select_model() {
   provider_arg=$1
   if [[ "$provider_arg" == "groq" || "$provider_arg" == "g" ]]; then
@@ -37,19 +51,17 @@ select_model() {
     return 1
   fi
 
-  echo "Available models for $provider_arg (or default):"
-  list_models "$provider_arg"
   read -p "Enter model name (or press Enter for default '$default_model'): " selected_model
 
   if [[ -z "$selected_model" ]]; then
     selected_model="$default_model"
   fi
-  echo "Using model: $selected_model"
+  #echo "Using model: $selected_model" # Removed the "Using model:" message
   echo "$selected_model"
-  return "$?"
+  return 0 # Return 0 for success
 }
 
-# Function to set API key
+# Function to set API key for the selected provider
 set_api_key() {
   provider_arg=$1
   case "$provider_arg" in
@@ -68,7 +80,7 @@ set_api_key() {
   return 0
 }
 
-# Function to run aider
+# Function to run aider with the selected model and API key
 run_aider() {
   local model="$1"
   local api_key="$2"
@@ -78,40 +90,13 @@ run_aider() {
     return 1
   fi
 
+  echo "Running aider with model: $model and API key: $api_key"
+
+  echo aider --no-auto-commits --no-dirty-commits --model "$model" --api-key "$api_key"
   aider --no-auto-commits --no-dirty-commits --model "$model" --api-key "$api_key"
-  return "$?"
+
+  return 0
 }
 
-# Main script logic
-case $1 in
-  groq|g)
-    selected_model=$(select_model "$1")
-    if [ $? -ne 0 ]; then
-      exit 1
-    fi
-    api_key=$(set_api_key "$1")
-    if [ $? -ne 0 ]; then
-      exit 1
-    fi
-    run_aider "$selected_model" "$api_key"
-    ;;
-  openrouter|o|"")
-    selected_model=$(select_model "$1")
-    if [ $? -ne 0 ]; then
-      exit 1
-    fi
-    api_key=$(set_api_key "$1")
-    if [ $? -ne 0 ]; then
-      exit 1
-    fi
-    run_aider "$selected_model" "$api_key"
-    ;;
-  list)
-    list_models "$2"
-    exit 0
-    ;;
-  *)
-    echo "Invalid option"
-    exit 1
-    ;;
-esac
+# Call the main function
+main
